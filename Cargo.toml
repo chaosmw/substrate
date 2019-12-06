@@ -1,5 +1,7 @@
 [workspace]
 members = [
+	"bin/pistis",
+	"bin/pistis/runtime",
 	"bin/node-template",
 	"bin/node-template/runtime",
 	"bin/node/cli",
