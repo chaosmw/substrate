@@ -32,6 +32,7 @@ transaction-payment = { package = "pallet-transaction-payment", path = "../../..
 txpool-runtime-api = { package = "sp-transaction-pool-runtime-api", path = "../../../primitives/transaction-pool/runtime-api", default-features = false }
 version = { package = "sp-version", path = "../../../primitives/sr-version", default-features = false }
 name-service = { package = "name-service-module", path = "../name-service", default_features = false }
+business = { package = "business-module", path = "../business", default_features = false }
 
 [build-dependencies]
 wasm-builder-runner = { package = "substrate-wasm-builder-runner", path = "../../../client/utils/wasm-builder-runner", version = "1.0.4" }
@@ -40,6 +41,7 @@ wasm-builder-runner = { package = "substrate-wasm-builder-runner", path = "../..
 default = ["std"]
 std = [
 	"name-service/std",
+	"business/std",
 	"aura-primitives/std",
 	"aura/std",
 	"balances/std",

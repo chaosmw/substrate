@@ -34,6 +34,12 @@ use support::{
 	weights::SimpleDispatchInfo,
 };
 use system::{ensure_root, ensure_signed};
+// use serde::{Serialize, Deserialize, de::DeserializeOwned};
+// #[cfg(std)]
+// use serde_json::Value;
+
+// #[cfg(no_std)]
+// use serde_json_core::Value;
 
 #[cfg(test)]
 mod name_service_test;
@@ -59,6 +65,13 @@ pub struct ResolveRecord<Hash, AccountId> {
 	/// The zone file
 	pub zone: Vec<u8>,
 }
+
+// #[derive(Encode, Decode, Default, Clone, PartialEq)]
+// pub struct ZoneFile {
+// 	pub storage: Vec<u8>,
+// 	pub read_url: Vec<u8>,
+// 	pub write_url: Vec<u8>,
+// }
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
 type NegativeImbalanceOf<T> =
@@ -350,8 +363,8 @@ decl_module! {
 			let sender = ensure_signed(origin)?;
 			Self::only_owner(node_hash, &sender)?;
 
-			ensure!(name.len() >= T::MinLength::get(), "Name too short");
-			ensure!(name.len() <= T::MaxLength::get(), "Name too long");
+			ensure!(name.len() >= T::MinLength::get(), "name too short");
+			ensure!(name.len() <= T::MaxLength::get(), "name too long");
 			
 			Self::do_set_resolve_name(node_hash, &name)?;
 			Self::deposit_event(RawEvent::ResolveNameChanged(node_hash, name));
@@ -377,8 +390,13 @@ decl_module! {
 			let sender = ensure_signed(origin)?;
 			Self::only_owner(node_hash, &sender)?;
 
-			ensure!(zone.len() <= T::MaxZoneLength::get(), "Zone content too long");
+			ensure!(zone.len() <= T::MaxZoneLength::get(), "zone content too long");
 			// TODO: check json
+			// #[cfg(std)]
+			// let _json = serde_json::from_str::<Value>(&String::from_utf8(zone.clone()).unwrap());
+
+			// #[cfg(no_std)]
+			// let _json = serde_json_core::from_str::<Value>(&String::from_utf8(zone.clone()).unwrap());
 			
 			Self::do_set_resolve_zone(node_hash, &zone)?;
 			Self::deposit_event(RawEvent::ResolveZoneChanged(node_hash, zone));

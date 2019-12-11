@@ -165,8 +165,129 @@ mod tests {
 	#[test]
 	fn set_root_owner_should_work() {
 		new_test_ext().execute_with(|| {
+			assert_noop!(NameService::set_root_owner(Origin::signed(2), 3), "bad origin");
 			assert_ok!(NameService::set_root_owner(Origin::signed(1), 3));
 			assert_eq!(NameService::node_of(<Test as system::Trait>::Hash::default()).unwrap().owner, 3);
+			assert_ok!(NameService::set_root_owner(Origin::signed(1), 4));
+			assert_eq!(NameService::node_of(<Test as system::Trait>::Hash::default()).unwrap().owner, 4);
 		});	
 	}
+
+	#[test]
+	fn set_owner_should_work() {
+		new_test_ext().execute_with(|| {
+			assert_ok!(NameService::set_root_owner(Origin::signed(1), 3));
+			assert_noop!(NameService::set_owner(Origin::signed(1), [1;32].into(), 4), "node does not exist");
+			let root_hash = <Test as system::Trait>::Hash::default(); 
+			assert_noop!(NameService::set_owner(Origin::signed(1), root_hash, 4), "sender is not owner");
+			assert_ok!(NameService::set_owner(Origin::signed(3), root_hash, 4));
+			assert_eq!(NameService::node_of(root_hash).unwrap().owner, 4);
+		});	
+	}
+
+	#[test]
+	fn set_subnode_owner_should_work() {
+		new_test_ext().execute_with(|| {
+			assert_ok!(NameService::set_root_owner(Origin::signed(1), 3));
+			let label = ("eth").using_encoded(<Test as system::Trait>::Hashing::hash); 
+			assert_noop!(NameService::set_subnode_owner(Origin::signed(1), [1;32].into(), label, 4), "node does not exist");
+			let root_hash = <Test as system::Trait>::Hash::default(); 
+			assert_noop!(NameService::set_subnode_owner(Origin::signed(1), root_hash, label, 4), "sender is not owner");
+			// set eth to account 4
+			assert_ok!(NameService::set_subnode_owner(Origin::signed(3), root_hash, label, 4));
+			let node_hash = (root_hash, label).using_encoded(<Test as system::Trait>::Hashing::hash);
+			assert_eq!(NameService::node_of(node_hash).unwrap().owner, 4);
+			println!("node_hash={}", node_hash);
+
+			let label = ("hsiung").using_encoded(<Test as system::Trait>::Hashing::hash);
+			// set hsiung.eth to account 5
+			assert_ok!(NameService::set_subnode_owner(Origin::signed(4), node_hash, label, 5));
+			let node_hash = (node_hash, label).using_encoded(<Test as system::Trait>::Hashing::hash);
+			assert_eq!(NameService::node_of(node_hash).unwrap().owner, 5);
+			println!("node_hash={}", node_hash);	
+		});	
+	}
+
+	#[test]
+	fn set_ttl_should_work() {
+		new_test_ext().execute_with(|| {
+			assert_ok!(NameService::set_root_owner(Origin::signed(1), 3));
+			let label = ("eth").using_encoded(<Test as system::Trait>::Hashing::hash); 
+			assert_noop!(NameService::set_subnode_owner(Origin::signed(1), [1;32].into(), label, 4), "node does not exist");
+			let node_hash = <Test as system::Trait>::Hash::default(); 
+			assert_noop!(NameService::set_ttl(Origin::signed(3), node_hash, 0), "ttl is the same value");
+			assert_ok!(NameService::set_ttl(Origin::signed(3), node_hash, 10));
+			assert_eq!(NameService::node_of(node_hash).unwrap().ttl, 10);
+		});
+	}
+
+	#[test]
+	fn set_resolve_addr_should_work() {
+		new_test_ext().execute_with(||{
+			assert_ok!(NameService::set_root_owner(Origin::signed(1), 3));
+			let label = ("eth").using_encoded(<Test as system::Trait>::Hashing::hash); 
+			let root_hash = <Test as system::Trait>::Hash::default(); 
+			assert_ok!(NameService::set_subnode_owner(Origin::signed(3), root_hash, label, 4));
+			let node_hash = (root_hash, label).using_encoded(<Test as system::Trait>::Hashing::hash);
+
+			let addr = 1004;
+			assert_ok!(NameService::set_resolve_addr(Origin::signed(4), node_hash, addr));
+			assert_noop!(NameService::set_resolve_addr(Origin::signed(4), node_hash, addr), "addr is the same value");
+			assert_eq!(NameService::resolve_of(node_hash).unwrap().addr, addr);
+		});
+	}
+
+	#[test]
+	fn set_resolve_name_should_work() {
+		new_test_ext().execute_with(||{
+			assert_ok!(NameService::set_root_owner(Origin::signed(1), 3));
+			let label = ("eth").using_encoded(<Test as system::Trait>::Hashing::hash); 
+			let root_hash = <Test as system::Trait>::Hash::default(); 
+			assert_ok!(NameService::set_subnode_owner(Origin::signed(3), root_hash, label, 4));
+			let node_hash = (root_hash, label).using_encoded(<Test as system::Trait>::Hashing::hash);
+
+			assert_noop!(NameService::set_resolve_name(Origin::signed(4), node_hash, "e".into()), "name too short");
+			assert_noop!(NameService::set_resolve_name(Origin::signed(4), node_hash, "e".repeat(17).into()), "name too long");
+			
+			assert_ok!(NameService::set_resolve_name(Origin::signed(4), node_hash, "eth".into()));
+			assert_noop!(NameService::set_resolve_name(Origin::signed(4), node_hash, "eth".into()), "name is the same value");
+			assert_eq!(NameService::resolve_of(node_hash).unwrap().name, "eth".as_bytes());
+		});
+	}
+
+
+	#[test]
+	fn set_resolve_profile_should_work() {
+		new_test_ext().execute_with(||{
+			assert_ok!(NameService::set_root_owner(Origin::signed(1), 3));
+			let label = ("eth").using_encoded(<Test as system::Trait>::Hashing::hash); 
+			let root_hash = <Test as system::Trait>::Hash::default(); 
+			assert_ok!(NameService::set_subnode_owner(Origin::signed(3), root_hash, label, 4));
+			let node_hash = (root_hash, label).using_encoded(<Test as system::Trait>::Hashing::hash);
+
+			let profile = ("did:pistis:v0:1LrMVQmmEvJXsTmrXuarGrikk5nnB5Cvwg-1").using_encoded(<Test as system::Trait>::Hashing::hash);
+			assert_ok!(NameService::set_resolve_profile(Origin::signed(4), node_hash, profile));
+			assert_noop!(NameService::set_resolve_profile(Origin::signed(4), node_hash, profile), "profile is the same value");
+			assert_eq!(NameService::resolve_of(node_hash).unwrap().profile, profile);
+		});
+	}
+
+	#[test]
+	fn set_resolve_zone_should_work() {
+		new_test_ext().execute_with(||{
+			assert_ok!(NameService::set_root_owner(Origin::signed(1), 3));
+			let label = ("eth").using_encoded(<Test as system::Trait>::Hashing::hash); 
+			let root_hash = <Test as system::Trait>::Hash::default(); 
+			assert_ok!(NameService::set_subnode_owner(Origin::signed(3), root_hash, label, 4));
+			let node_hash = (root_hash, label).using_encoded(<Test as system::Trait>::Hashing::hash);
+
+			let zone = r#"{"compacity":50000000,"class":"normal","storage":"http://example.com/1LrMVQmmEvJXsTmrXuarGrikk5nnB5Cvwg"}"#;
+			assert_noop!(NameService::set_resolve_zone(Origin::signed(4), node_hash, "z".repeat(1025).into()), "zone content too long");
+			
+			assert_ok!(NameService::set_resolve_zone(Origin::signed(4), node_hash, zone.into()));
+			assert_noop!(NameService::set_resolve_zone(Origin::signed(4), node_hash, zone.into()), "zone is the same value");
+			assert_eq!(NameService::resolve_of(node_hash).unwrap().zone, zone.as_bytes());
+		});
+	}
+
 }
