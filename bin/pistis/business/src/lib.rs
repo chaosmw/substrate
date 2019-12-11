@@ -29,7 +29,7 @@ mod business_test;
 
 /// The business information
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
-pub struct BusinessInfo<NameHash, AccountId, BlockNumber> {
+pub struct Business<NameHash, AccountId, BlockNumber> {
 	/// The creator
 	pub creator: AccountId,
 	/// The name hash of the owner
@@ -42,10 +42,9 @@ pub struct BusinessInfo<NameHash, AccountId, BlockNumber> {
 	pub expiration: BlockNumber,
 }
 
-/// The record of some a product, generally speaking
-/// The information can be composed of several records
+/// The information of some a product, generally speaking
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
-pub struct ProductRecord<Hash, AccountId, BlockNumber> {
+pub struct ProductInfo<Hash, AccountId, BlockNumber> {
 	/// Creator account
 	pub creator: AccountId,
 	/// Creation time
@@ -58,11 +57,11 @@ pub struct ProductRecord<Hash, AccountId, BlockNumber> {
 
 /// The product information
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
-pub struct ProductInfo<Hash, AccountId, BlockNumber> {
+pub struct Product<Hash, AccountId, BlockNumber> {
 	/// Sequence ID of the record
-	pub seq_id: Vec<u8>, // TODO: add limit to length
+	pub seq_id: Vec<u8>, 
 	/// Product info array
-	pub infos: Vec<ProductRecord<Hash, AccountId, BlockNumber>>,
+	pub infos: Vec<ProductInfo<Hash, AccountId, BlockNumber>>,
 }
 
 type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
@@ -70,9 +69,9 @@ type NegativeImbalanceOf<T> =
 	<<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
 
 type NameHash<T> = <T as system::Trait>::Hash;
-type Business<T> = BusinessInfo<NameHash<T>, <T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber>;
+type BusinessOf<T> = Business<NameHash<T>, <T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber>;
+type ProductOf<T> = Product<<T as system::Trait>::Hash, <T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber>;
 type ProductInfoOf<T> = ProductInfo<<T as system::Trait>::Hash, <T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber>;
-type ProductRecordOf<T> = ProductRecord<<T as system::Trait>::Hash, <T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber>;
 
 pub trait Trait: system::Trait {
 	/// The overarching event type.
@@ -112,13 +111,13 @@ pub trait Trait: system::Trait {
 decl_storage! {
 	trait Store for Module<T: Trait> as NameServiceModule {
 		/// The lookup table for all the businesses
-		Businesses get(business_of): map T::Hash => BusinessInfo<NameHash<T>, T::AccountId, T::BlockNumber>;	
+		Businesses get(business_of): map T::Hash => BusinessOf<T>;	
 		/// The lookup table for all the product infos
-		ProductInfos get(product_info_of):  map T::Hash => ProductInfo<T::Hash, T::AccountId, T::BlockNumber>;
+		Products get(product_of):  map T::Hash => ProductOf<T>;
 		/// The counting table for business
-		ProductInfoCount get(product_info_count): map T::Hash => u64;
+		ProductCount get(product_count): map T::Hash => u64;
 		/// The lookup table for querying hash of product info with business and index
-		BusinessProductInfos get(business_product_info): map (T::Hash, u64) => T::Hash;
+		BusinessProductIndex get(business_product_index): map (T::Hash, u64) => T::Hash;
 		/// The nonce for hashing
 		Nonce: u64;
 	}
@@ -138,7 +137,7 @@ decl_event!(
 		/// Bisiness whitelist changed
 		BusinessWhitelistChanged(AccountId, Hash, Vec<Hash>),
 		/// Product info created
-		ProductInfoCreated(AccountId, Hash, Vec<u8>, Hash),
+		ProductCreated(AccountId, Hash, Vec<u8>, Hash),
 		/// Product info appended
 		ProductInfoAppended(AccountId, Hash, Vec<u8>, Hash),
 	}
@@ -196,7 +195,7 @@ decl_module! {
 				nonce,
 			).using_encoded(<T as system::Trait>::Hashing::hash);
 
-			let business = Business::<T> {
+			let business = BusinessOf::<T> {
 				creator: sender.clone(),
 				owner: owner, 
 				name: name.clone(),
@@ -272,28 +271,7 @@ decl_module! {
 			Self::deposit_event(RawEvent::BusinessWhitelistChanged(sender.clone(), biz_hash, new_list));	
 		}
 
-		// #[derive(Encode, Decode, Default, Clone, PartialEq)]
-		// pub struct ProductRecord<Hash, AccountId> {
-		// 	/// Creator account
-		// 	pub creator: AccountId,
-		// 	/// Creation time
-		// 	pub created_at: u64,
-		// 	/// Hash of data
-		// 	pub data_hash: Hash,
-		// 	/// Extra information
-		// 	pub extra: Vec<u8>, // JSON info for details
-		// }
-
-		// /// The product information
-		// #[derive(Encode, Decode, Default, Clone, PartialEq)]
-		// pub struct ProductInfo<Hash, AccountId> {
-		// 	/// Sequence ID of the record
-		// 	pub seq: Vec<u8>, // TODO: add limit to length
-		// 	/// Product info array
-		// 	pub infos: Vec<ProductRecord<Hash, AccountId>>,
-		// }
-
-		/// Create product info for a business
+		/// Create product for a business
 		/// 
 		/// @origin	the sender
 		/// @name_hash	the name hash of the operator
@@ -302,7 +280,7 @@ decl_module! {
 		/// @data_hash	the data hash to be stored with the product
 		/// @extra	the extra information, can be json string 
 		#[weight = SimpleDispatchInfo::FixedNormal(150_000)]
-		fn create_product_info(origin, name_hash: NameHash<T>, biz_hash: T::Hash, seq_id: Vec<u8>, data_hash: T::Hash, extra: Vec<u8>) {
+		fn create_product(origin, name_hash: NameHash<T>, biz_hash: T::Hash, seq_id: Vec<u8>, data_hash: T::Hash, extra: Vec<u8>) {
 			let sender = ensure_signed(origin)?;
 
 			Self::validate_authorization(&sender, name_hash)?;
@@ -314,29 +292,29 @@ decl_module! {
 			Self::validate_expiration(business.expiration)?;
 			ensure!(seq_id.len() <= T::MaxSeqIDLength::get(), "Sequence ID too long");
 			ensure!(extra.len() <= T::MaxExtraLength::get(), "Extra info too long");
-			// FIXME: what if the info hash collides?
-			let info_hash = (
+			// FIXME: what if the product hash collides?
+			let product_hash = (
 				biz_hash,
 				seq_id.clone(),
 			).using_encoded(<T as system::Trait>::Hashing::hash);
 
-			let record = ProductRecordOf::<T> {
+			let info = ProductInfoOf::<T> {
 				creator: sender.clone(),
 				created_at: Self::block_number(),
 				data_hash: data_hash,
 				extra: extra.clone(),
 			};
 
-			let info = ProductInfoOf::<T> {
+			let product = ProductOf::<T> {
 				seq_id: seq_id.clone(),
-				infos: vec![record],
+				infos: vec![info],
 			};
 
-			Self::insert_product_info(biz_hash, info_hash, &info)?;
-			Self::deposit_event(RawEvent::ProductInfoCreated(sender.clone(), biz_hash, seq_id.clone(), info_hash));	
+			Self::insert_product(biz_hash, product_hash, &product)?;
+			Self::deposit_event(RawEvent::ProductCreated(sender.clone(), biz_hash, seq_id.clone(), product_hash));	
 		}
 
-		/// Add product record for a business
+		/// Add product info for a business
 		/// 
 		/// @origin	the sender
 		/// @name_hash	the name hash of the operator
@@ -345,7 +323,7 @@ decl_module! {
 		/// @data_hash	the data hash to be stored with the product
 		/// @extra	the extra information, can be json string 
 		#[weight = SimpleDispatchInfo::FixedNormal(50_000)]
-		fn add_product_record(origin, name_hash: NameHash<T>, biz_hash: T::Hash, seq_id: Vec<u8>, data_hash: T::Hash, extra: Vec<u8>) {
+		fn add_product_info(origin, name_hash: NameHash<T>, biz_hash: T::Hash, seq_id: Vec<u8>, data_hash: T::Hash, extra: Vec<u8>) {
 			let sender = ensure_signed(origin)?;
 
 			Self::validate_authorization(&sender, name_hash)?;
@@ -358,20 +336,20 @@ decl_module! {
 			ensure!(seq_id.len() <= T::MaxSeqIDLength::get(), "Sequence ID too long");
 			ensure!(extra.len() <= T::MaxExtraLength::get(), "Extra info too long");
 			// FIXME: what if the info hash collides?
-			let info_hash = (
+			let product_hash = (
 				biz_hash,
 				seq_id.clone(),
 			).using_encoded(<T as system::Trait>::Hashing::hash);
 
-			let record = ProductRecordOf::<T> {
+			let info = ProductInfoOf::<T> {
 				creator: sender.clone(),
 				created_at: Self::block_number(),
 				data_hash: data_hash,
 				extra: extra.clone(),
 			};
 
-			Self::append_product_record(info_hash, &seq_id, record)?;
-			Self::deposit_event(RawEvent::ProductInfoAppended(sender.clone(), biz_hash, seq_id.clone(), info_hash));	
+			Self::append_product_info(product_hash, &seq_id, info)?;
+			Self::deposit_event(RawEvent::ProductInfoAppended(sender.clone(), biz_hash, seq_id.clone(), product_hash));	
 		}
 		
 	}
@@ -401,7 +379,7 @@ impl<T: Trait> Module<T> {
 	/// 
 	/// @hash	the business hash
 	/// @business	the business object
-	pub fn insert_business(hash: T::Hash, business: &Business<T>) -> Result {
+	pub fn insert_business(hash: T::Hash, business: &BusinessOf<T>) -> Result {
 		ensure!(!<Businesses<T>>::exists(hash), "Business already exists");
 
 		<Businesses<T>>::insert(hash, business);
@@ -413,38 +391,38 @@ impl<T: Trait> Module<T> {
 	/// Insert product info to the lookup table
 	/// 
 	/// @biz_hash	the business hash
-	/// @info_hash	the info hash
+	/// @product_hash	the info hash
 	/// @info	the product info
-	pub fn insert_product_info(biz_hash: T::Hash, info_hash: T::Hash, info: &ProductInfoOf<T>) -> Result {
-		ensure!(!<ProductInfos<T>>::exists(info_hash), "Product info already exists");
+	pub fn insert_product(biz_hash: T::Hash, product_hash: T::Hash, info: &ProductOf<T>) -> Result {
+		ensure!(!<Products<T>>::exists(product_hash), "Product info already exists");
 
-        let info_count = Self::product_info_count(biz_hash);
+        let info_count = Self::product_count(biz_hash);
         let new_info_count = info_count
             .checked_add(1)
             .ok_or("Overflow adding a new product info")?;
 
-		ensure!(!<BusinessProductInfos<T>>::exists((biz_hash, info_count)), "Business product info hash collides???");
-		<ProductInfos<T>>::insert(info_hash, info);
-		<BusinessProductInfos<T>>::insert((biz_hash, info_count), info_hash);
-		<ProductInfoCount<T>>::insert(biz_hash, new_info_count);
+		ensure!(!<BusinessProductIndex<T>>::exists((biz_hash, info_count)), "Business product info hash collides???");
+		<Products<T>>::insert(product_hash, info);
+		<BusinessProductIndex<T>>::insert((biz_hash, info_count), product_hash);
+		<ProductCount<T>>::insert(biz_hash, new_info_count);
 		
 		Ok(())
 	}
 
-	/// Append product record to existing product info
+	/// Append product info to an existing product
 	/// 
-	/// @info_hash	the info hash
+	/// @product_hash	the product hash
 	/// @seq_id	the sequence id
-	/// @record	the product record
-	pub fn append_product_record(info_hash: T::Hash, seq_id: &Vec<u8>, record: ProductRecordOf<T>) -> Result {
-		ensure!(<ProductInfos<T>>::exists(info_hash), "Product info does not exist");
+	/// @info	the product info
+	pub fn append_product_info(product_hash: T::Hash, seq_id: &Vec<u8>, info: ProductInfoOf<T>) -> Result {
+		ensure!(<Products<T>>::exists(product_hash), "Product info does not exist");
 
-		let mut info = Self::product_info_of(info_hash);
-		ensure!(info.seq_id == *seq_id, "Product sequence id not match, should not happen");
+		let mut product = Self::product_of(product_hash);
+		ensure!(product.seq_id == *seq_id, "Product sequence id not match, should not happen");
 		// Append the record to the end of collection
-		info.infos.push(record);
+		product.infos.push(info);
 
-		<ProductInfos<T>>::insert(info_hash, info);
+		<Products<T>>::insert(product_hash, product);
 
 		Ok(())
 	}
