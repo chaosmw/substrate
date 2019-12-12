@@ -510,3 +510,57 @@ impl<T: Trait> Module<T> {
 		Ok(())
 	}
 }
+
+/// Client module should use this trait to communicate with the name service module
+pub trait NameServiceResolver<T: system::Trait> {
+	/// Resolve to record
+	fn resolve(node_hash: T::Hash) -> Option<ResolveRecord<T::Hash, T::AccountId>>;
+	/// Resolve to addr
+	fn resolve_addr(node_hash: T::Hash) -> Option<T::AccountId>;
+	/// Resolve to name
+	fn resolve_name(node_hash: T::Hash) -> Option<Vec<u8>>;
+	/// Resolve to profile hash
+	fn resolve_profile(node_hash: T::Hash) -> Option<T::Hash>;
+	/// Resolve to zone content
+	fn resolve_zone(node_hash: T::Hash) -> Option<Vec<u8>>;
+}
+
+impl <T: Trait> NameServiceResolver<T> for Module<T> {
+	/// Resolve name hash to record
+	fn resolve(node_hash: T::Hash) -> Option<ResolveRecord<T::Hash, T::AccountId>> {
+		Self::resolve_of(node_hash)
+	}
+
+	/// Resolve name hash to addr
+	fn resolve_addr(node_hash: T::Hash) -> Option<T::AccountId> {
+		match Self::resolve_of(node_hash) {
+			Some(record) => Some(record.addr),
+			None => None,
+		}
+	}
+
+	/// Resolve name hash to name
+	fn resolve_name(node_hash: T::Hash) -> Option<Vec<u8>> {
+		match Self::resolve_of(node_hash) {
+			Some(record) => Some(record.name),
+			None => None,
+		}
+	}
+
+	/// Resolve name hash to profile
+	fn resolve_profile(node_hash: T::Hash) -> Option<T::Hash> {
+		match Self::resolve_of(node_hash) {
+			Some(record) => Some(record.profile),
+			None => None,
+		}
+	}
+
+	/// Resolve name hash to zone content
+	fn resolve_zone(node_hash: T::Hash) -> Option<Vec<u8>> {
+		match Self::resolve_of(node_hash) {
+			Some(record) => Some(record.zone),
+			None => None,
+		}
+	}	
+}
+

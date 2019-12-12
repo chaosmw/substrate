@@ -15,6 +15,7 @@ system = { package = "frame-system", path = "../../../frame/system", default-fea
 balances = { package = "pallet-balances", path = "../../../frame/balances", default-features = false }
 primitives = { package = "sp-core", path = "../../../primitives/core", default-features = false }
 randomness-collective-flip = { package = "pallet-randomness-collective-flip", path = "../../../frame/randomness-collective-flip", default_features = false }	
+name-service = { package = "name-service-module", path = "../name-service", default_features = false }
 
 [dev-dependencies]
 
@@ -31,4 +32,5 @@ std = [
 	"balances/std",
 	"primitives/std",
 	"randomness-collective-flip/std",
+	"name-service/std",
 ]

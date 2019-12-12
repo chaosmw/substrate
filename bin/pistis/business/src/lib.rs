@@ -23,6 +23,7 @@ use support::{
 	weights::SimpleDispatchInfo,
 };
 use system::{ensure_root, ensure_signed};
+use name_service::NameServiceResolver;
 
 #[cfg(test)]
 mod business_test;
@@ -106,6 +107,11 @@ pub trait Trait: system::Trait {
 	
 	/// The maximum length an extra info may be
 	type MaxExtraLength: Get<usize>;
+
+	/// The maximum info entries a product may have
+	type MaxProductInfoCount: Get<usize>;
+
+	type NameServiceResolver: NameServiceResolver<Self>; 
 }
 
 decl_storage! {
@@ -168,6 +174,9 @@ decl_module! {
 	
 		/// The maximum length an extra info may be
 		const MaxExtraLength: u32 = T::MaxExtraLength::get() as u32; 
+
+		/// The maximum info entries a product may have
+		const MaxProductInfoCount: u32 = T::MaxProductInfoCount::get() as u32;
 
 		/// Create business 
 		/// 
@@ -362,8 +371,8 @@ impl<T: Trait> Module<T> {
 	/// @sender	the sender
 	/// @hash	the name hash 
 	pub fn validate_authorization(sender: &T::AccountId, hash: NameHash<T>) -> Result {
-		// TODO: check the resolved address against sender
-		// ensure!(sender == address, "Not authorized")?;
+		// Check the resolved address against sender
+		ensure!(Some(sender.clone()) == T::NameServiceResolver::resolve_addr(hash), "Not authorized");
 		Ok(())
 	}
 
@@ -381,9 +390,7 @@ impl<T: Trait> Module<T> {
 	/// @business	the business object
 	pub fn insert_business(hash: T::Hash, business: &BusinessOf<T>) -> Result {
 		ensure!(!<Businesses<T>>::exists(hash), "Business already exists");
-
 		<Businesses<T>>::insert(hash, business);
-		
 			
 		Ok(())
 	}
@@ -394,14 +401,14 @@ impl<T: Trait> Module<T> {
 	/// @product_hash	the info hash
 	/// @info	the product info
 	pub fn insert_product(biz_hash: T::Hash, product_hash: T::Hash, info: &ProductOf<T>) -> Result {
-		ensure!(!<Products<T>>::exists(product_hash), "Product info already exists");
+		ensure!(!<Products<T>>::exists(product_hash), "Product already exists");
 
         let info_count = Self::product_count(biz_hash);
         let new_info_count = info_count
             .checked_add(1)
-            .ok_or("Overflow adding a new product info")?;
+            .ok_or("Overflow adding a new product")?;
 
-		ensure!(!<BusinessProductIndex<T>>::exists((biz_hash, info_count)), "Business product info hash collides???");
+		ensure!(!<BusinessProductIndex<T>>::exists((biz_hash, info_count)), "Business product hash collides???");
 		<Products<T>>::insert(product_hash, info);
 		<BusinessProductIndex<T>>::insert((biz_hash, info_count), product_hash);
 		<ProductCount<T>>::insert(biz_hash, new_info_count);
@@ -415,25 +422,17 @@ impl<T: Trait> Module<T> {
 	/// @seq_id	the sequence id
 	/// @info	the product info
 	pub fn append_product_info(product_hash: T::Hash, seq_id: &Vec<u8>, info: ProductInfoOf<T>) -> Result {
-		ensure!(<Products<T>>::exists(product_hash), "Product info does not exist");
+		ensure!(<Products<T>>::exists(product_hash), "Product does not exist");
 
 		let mut product = Self::product_of(product_hash);
 		ensure!(product.seq_id == *seq_id, "Product sequence id not match, should not happen");
+		ensure!(product.infos.len() < T::MaxProductInfoCount::get(), "Exceeds max product info limit");
 		// Append the record to the end of collection
 		product.infos.push(info);
 
 		<Products<T>>::insert(product_hash, product);
 
 		Ok(())
-	}
-
-	/// Resolve address by name hash
-	/// 
-	/// @hash	the name hash
-	/// @return account address if found, otherwise return None
-	pub fn resolve_addr(hash: NameHash<T>) -> Option<T::AccountId> {
-		// TODO: 
-		None
 	}
 
 	/// Get current block number
