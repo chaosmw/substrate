@@ -6,8 +6,6 @@
 //! ## Overview
 //!
 //! This module is for business registration and product records
-//!
-
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -19,7 +17,7 @@ use support::{
 	decl_event, decl_module, decl_storage,
 	dispatch::Result,
 	ensure,
-	traits::{Currency, Get, OnUnbalanced, ReservableCurrency, Randomness},
+	traits::{Get, Randomness},
 	weights::SimpleDispatchInfo,
 };
 use system::{ensure_root, ensure_signed};
@@ -28,7 +26,7 @@ use name_service::NameServiceResolver;
 #[cfg(test)]
 mod business_test;
 
-/// The business information
+/// The business struct 
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
 pub struct Business<NameHash, AccountId, BlockNumber> {
 	/// The creator
@@ -43,7 +41,7 @@ pub struct Business<NameHash, AccountId, BlockNumber> {
 	pub expiration: BlockNumber,
 }
 
-/// The information of some a product, generally speaking
+/// The information of a product
 #[derive(Encode, Decode, Default, Clone, PartialEq)]
 pub struct ProductInfo<Hash, AccountId, BlockNumber> {
 	/// Creator account
@@ -65,10 +63,6 @@ pub struct Product<Hash, AccountId, BlockNumber> {
 	pub infos: Vec<ProductInfo<Hash, AccountId, BlockNumber>>,
 }
 
-type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
-type NegativeImbalanceOf<T> =
-	<<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
-
 type NameHash<T> = <T as system::Trait>::Hash;
 type BusinessOf<T> = Business<NameHash<T>, <T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber>;
 type ProductOf<T> = Product<<T as system::Trait>::Hash, <T as system::Trait>::AccountId, <T as system::Trait>::BlockNumber>;
@@ -77,16 +71,7 @@ type ProductInfoOf<T> = ProductInfo<<T as system::Trait>::Hash, <T as system::Tr
 pub trait Trait: system::Trait {
 	/// The overarching event type.
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-
-	/// The currency trait.
-	type Currency: ReservableCurrency<Self::AccountId>;
-
-	/// Reservation fee.
-	type ReservationFee: Get<BalanceOf<Self>>;
-
-	/// What to do with slashed funds.
-	type Slashed: OnUnbalanced<NegativeImbalanceOf<Self>>;
-
+	
 	/// The origin which may forcibly set or remove a name. Root can always do this.
 	type ForceOrigin: EnsureOrigin<Self::Origin>;
 
@@ -99,8 +84,8 @@ pub trait Trait: system::Trait {
 	/// The maximum length a zone may be
 	type MaxZoneLength: Get<usize>;
 
-	/// The scope's name hash 
-	type ScopeNameHash: Get<<Self as system::Trait>::Hash>; 
+	/// The scope's name 
+	type ScopeName: Get<&'static str>; 
 
 	/// The maximum length a sequence id may be
 	type MaxSeqIDLength: Get<usize>;
@@ -111,6 +96,7 @@ pub trait Trait: system::Trait {
 	/// The maximum info entries a product may have
 	type MaxProductInfoCount: Get<usize>;
 
+	/// The name service resolver
 	type NameServiceResolver: NameServiceResolver<Self>; 
 }
 
@@ -154,9 +140,6 @@ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		fn deposit_event() = default;
 
-		/// Reservation fee.
-		const ReservationFee: BalanceOf<T> = T::ReservationFee::get();
-
 		/// The minimum length a name may be.
 		const MinLength: u32 = T::MinLength::get() as u32;
 
@@ -166,8 +149,8 @@ decl_module! {
 		/// The maximum length a zone may be.
 		const MaxZoneLength: u32 = T::MaxZoneLength::get() as u32;
 
-		/// The scope's name hash
-		const ScopeNameHash: T::Hash = T::ScopeNameHash::get();
+		/// The scope's name
+		const ScopeName: &'static str = T::ScopeName::get();
 
 		/// The maximum length a sequence id may be
 		const MaxSeqIDLength: u32 = T::MaxSeqIDLength::get() as u32;
@@ -188,7 +171,7 @@ decl_module! {
 		fn create_business(origin, owner: NameHash<T>, name: Vec<u8>, expiration: T::BlockNumber) {
 			let sender = ensure_signed(origin)?;
 			// Check if sender has previledge
-			Self::validate_authorization(&sender, T::ScopeNameHash::get())?;
+			Self::validate_authorization(&sender, Self::scope_name_hash())?;
 
 			ensure!(name.len() >= T::MinLength::get(), "Name too short");
 			ensure!(name.len() <= T::MaxLength::get(), "Name too long");
@@ -197,13 +180,7 @@ decl_module! {
 
 			// Generate hash for business
 			let nonce = Nonce::get();
-			let biz_hash = (
-				<randomness_collective_flip::Module<T>>::random_seed(),
-				&sender,
-				owner, // TODO: add other fields
-				nonce,
-			).using_encoded(<T as system::Trait>::Hashing::hash);
-
+			let biz_hash = Self::business_hash(sender.clone(), owner);
 			let business = BusinessOf::<T> {
 				creator: sender.clone(),
 				owner: owner, 
@@ -226,11 +203,12 @@ decl_module! {
 		#[weight = SimpleDispatchInfo::FixedNormal(50_000)]
 		fn set_business_expiration(origin, biz_hash: T::Hash, expiration: T::BlockNumber) {
 			let sender = ensure_signed(origin)?;
-			Self::validate_authorization(&sender, T::ScopeNameHash::get())?;
+			Self::validate_authorization(&sender, Self::scope_name_hash())?;
 
 			ensure!(<Businesses<T>>::exists(biz_hash), "Business does not exist");
 			let mut business = Self::business_of(biz_hash);
-			
+			// FIXME: unnecessary? 
+			Self::validate_expiration(expiration)?;
 			ensure!(business.expiration != expiration, "Same value");
 			business.expiration = expiration;
 			<Businesses<T>>::insert(biz_hash, business);
@@ -302,11 +280,7 @@ decl_module! {
 			ensure!(seq_id.len() <= T::MaxSeqIDLength::get(), "Sequence ID too long");
 			ensure!(extra.len() <= T::MaxExtraLength::get(), "Extra info too long");
 			// FIXME: what if the product hash collides?
-			let product_hash = (
-				biz_hash,
-				seq_id.clone(),
-			).using_encoded(<T as system::Trait>::Hashing::hash);
-
+			let product_hash = Self::product_hash(biz_hash, seq_id.clone());
 			let info = ProductInfoOf::<T> {
 				creator: sender.clone(),
 				created_at: Self::block_number(),
@@ -345,11 +319,7 @@ decl_module! {
 			ensure!(seq_id.len() <= T::MaxSeqIDLength::get(), "Sequence ID too long");
 			ensure!(extra.len() <= T::MaxExtraLength::get(), "Extra info too long");
 			// FIXME: what if the info hash collides?
-			let product_hash = (
-				biz_hash,
-				seq_id.clone(),
-			).using_encoded(<T as system::Trait>::Hashing::hash);
-
+			let product_hash = Self::product_hash(biz_hash, seq_id.clone());
 			let info = ProductInfoOf::<T> {
 				creator: sender.clone(),
 				created_at: Self::block_number(),
@@ -365,7 +335,6 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
-
 	/// Validate authorization by checking if the name hash is resolved to the sender
 	/// 
 	/// @sender	the sender
@@ -438,5 +407,37 @@ impl<T: Trait> Module<T> {
 	/// Get current block number
     fn block_number() -> T::BlockNumber {
         <system::Module<T>>::block_number()
-    }
+	}
+
+	/// Get business hash
+	/// 
+	/// @sender	the sender
+	/// @owner	the owner's name hash
+	fn business_hash(sender: T::AccountId, owner: NameHash<T>) -> T::Hash {
+		let nonce = Nonce::get();
+		// TODO: use u64 as business id? 
+		(
+			// <randomness_collective_flip::Module<T>>::random_seed(),
+			sender,
+			owner, // TODO: add other fields
+			nonce,
+		).using_encoded(<T as system::Trait>::Hashing::hash)
+	}
+
+	/// Get product hash
+	/// 
+	/// @biz_hash	the business hash
+	/// @seq_id	the sequence id
+	fn product_hash(biz_hash: T::Hash, seq_id: Vec<u8>) -> T::Hash {
+		(
+			biz_hash,
+			seq_id.clone(),
+		).using_encoded(<T as system::Trait>::Hashing::hash)
+	}
+	
+	/// Get scope name hash
+	fn scope_name_hash() -> T::Hash {
+		// TODO: calculate name hash recursively
+		(T::ScopeName::get()).using_encoded(<T as system::Trait>::Hashing::hash)
+	}
 }

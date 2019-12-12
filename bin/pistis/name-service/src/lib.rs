@@ -514,15 +514,15 @@ impl<T: Trait> Module<T> {
 /// Client module should use this trait to communicate with the name service module
 pub trait NameServiceResolver<T: system::Trait> {
 	/// Resolve to record
-	fn resolve(node_hash: T::Hash) -> Option<ResolveRecord<T::Hash, T::AccountId>>;
+	fn resolve(node_hash: T::Hash) -> Option<ResolveRecord<T::Hash, T::AccountId>> { None }
 	/// Resolve to addr
-	fn resolve_addr(node_hash: T::Hash) -> Option<T::AccountId>;
+	fn resolve_addr(node_hash: T::Hash) -> Option<T::AccountId> { None }
 	/// Resolve to name
-	fn resolve_name(node_hash: T::Hash) -> Option<Vec<u8>>;
+	fn resolve_name(node_hash: T::Hash) -> Option<Vec<u8>> { None }
 	/// Resolve to profile hash
-	fn resolve_profile(node_hash: T::Hash) -> Option<T::Hash>;
+	fn resolve_profile(node_hash: T::Hash) -> Option<T::Hash> { None }
 	/// Resolve to zone content
-	fn resolve_zone(node_hash: T::Hash) -> Option<Vec<u8>>;
+	fn resolve_zone(node_hash: T::Hash) -> Option<Vec<u8>> { None }
 }
 
 impl <T: Trait> NameServiceResolver<T> for Module<T> {
