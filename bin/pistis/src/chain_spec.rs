@@ -1,7 +1,8 @@
 use primitives::{Pair, Public, sr25519};
 use runtime::{
 	AccountId, AuraConfig, BalancesConfig, GenesisConfig, GrandpaConfig,
-	SudoConfig, IndicesConfig, SystemConfig, WASM_BINARY, Signature
+	SudoConfig, IndicesConfig, SystemConfig, WASM_BINARY, Signature,
+	CouncilConfig,
 };
 use aura_primitives::sr25519::{AuthorityId as AuraId};
 use grandpa_primitives::{AuthorityId as GrandpaId};
@@ -65,6 +66,8 @@ impl Alternative {
 					get_account_id_from_seed::<sr25519::Public>("Bob"),
 					get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
 					get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+					get_account_id_from_seed::<sr25519::Public>("Ray"),
+					get_account_id_from_seed::<sr25519::Public>("Ray//stash"),
 				],
 				true),
 				vec![],
@@ -138,6 +141,11 @@ fn testnet_genesis(initial_authorities: Vec<(AuraId, GrandpaId)>,
 		}),
 		grandpa: Some(GrandpaConfig {
 			authorities: initial_authorities.iter().map(|x| (x.1.clone(), 1)).collect(),
+		}),
+		collective_Instance1: Some(CouncilConfig {
+			members: endowed_accounts.iter().cloned()
+				.collect::<Vec<_>>()[..5].to_vec(),
+			phantom: Default::default(),
 		}),
 	}
 }

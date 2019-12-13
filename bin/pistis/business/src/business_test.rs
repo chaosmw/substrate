@@ -70,9 +70,8 @@ mod tests {
 	const RAY: &str = "ray";
 
 	parameter_types! {
-		pub const MinLength: usize = 3;
-		pub const MaxLength: usize = 16;
-		pub const MaxZoneLength: usize = 1024;
+		pub const MinNameLength: usize = 3;
+		pub const MaxNameLength: usize = 16;
 		pub const One: u64 = 1;
 		pub const ScopeName: &'static str = SCOPE_PISTIS;
 		pub const MaxSeqIDLength: usize = 64;
@@ -82,9 +81,8 @@ mod tests {
 	impl Trait for Test {
 		type Event = ();
 		type ForceOrigin = EnsureSignedBy<One, u64>;
-		type MinLength = MinLength;
-		type MaxLength = MaxLength;
-		type MaxZoneLength = MaxZoneLength;
+		type MinNameLength = MinNameLength;
+		type MaxNameLength = MaxNameLength;
 		type ScopeName = ScopeName; 
 		type MaxSeqIDLength = MaxSeqIDLength;
 		type MaxExtraLength = MaxExtraLength;

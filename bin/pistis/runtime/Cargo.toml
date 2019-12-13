@@ -31,6 +31,7 @@ timestamp = { package = "pallet-timestamp", path = "../../../frame/timestamp", d
 transaction-payment = { package = "pallet-transaction-payment", path = "../../../frame/transaction-payment", default-features = false }
 txpool-runtime-api = { package = "sp-transaction-pool-runtime-api", path = "../../../primitives/transaction-pool/runtime-api", default-features = false }
 version = { package = "sp-version", path = "../../../primitives/sr-version", default-features = false }
+collective = { package = "pallet-collective", path = "../../../frame/collective", default-features = false }
 name-service = { package = "name-service-module", path = "../name-service", default_features = false }
 business = { package = "business-module", path = "../business", default_features = false }
 
@@ -42,6 +43,7 @@ default = ["std"]
 std = [
 	"name-service/std",
 	"business/std",
+	"collective/std",
 	"aura-primitives/std",
 	"aura/std",
 	"balances/std",

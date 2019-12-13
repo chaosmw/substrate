@@ -82,10 +82,10 @@ pub trait Trait: system::Trait {
 	type ForceOrigin: EnsureOrigin<Self::Origin>;
 
 	/// The minimum length a name may be.
-	type MinLength: Get<usize>;
+	type MinNameLength: Get<usize>;
 
 	/// The maximum length a name may be.
-	type MaxLength: Get<usize>;
+	type MaxNameLength: Get<usize>;
 
 	/// The maxinum length a zone may be
 	type MaxZoneLength: Get<usize>;
@@ -133,10 +133,10 @@ decl_module! {
 		fn deposit_event() = default;
 
 		/// The minimum length a name may be.
-		const MinLength: u32 = T::MinLength::get() as u32;
+		const MinNameLength: u32 = T::MinNameLength::get() as u32;
 
 		/// The maximum length a name may be.
-		const MaxLength: u32 = T::MaxLength::get() as u32;
+		const MaxNameLength: u32 = T::MaxNameLength::get() as u32;
 
 		/// The maximum length a zone may be.
 		const MaxZoneLength: u32 = T::MaxZoneLength::get() as u32;
@@ -223,8 +223,8 @@ decl_module! {
 			let sender = ensure_signed(origin)?;
 			Self::only_owner(node_hash, &sender)?;
 
-			ensure!(name.len() >= T::MinLength::get(), "name too short");
-			ensure!(name.len() <= T::MaxLength::get(), "name too long");
+			ensure!(name.len() >= T::MinNameLength::get(), "name too short");
+			ensure!(name.len() <= T::MaxNameLength::get(), "name too long");
 			
 			Self::do_set_resolve_name(node_hash, &name)?;
 			Self::deposit_event(RawEvent::ResolveNameChanged(node_hash, name));
@@ -367,15 +367,15 @@ impl<T: Trait> Module<T> {
 /// Client module should use this trait to communicate with the name service module
 pub trait NameServiceResolver<T: system::Trait> {
 	/// Resolve to record
-	fn resolve(node_hash: T::Hash) -> Option<ResolveRecord<T::Hash, T::AccountId>> { None }
+	fn resolve(_node_hash: T::Hash) -> Option<ResolveRecord<T::Hash, T::AccountId>> { None }
 	/// Resolve to addr
-	fn resolve_addr(node_hash: T::Hash) -> Option<T::AccountId> { None }
+	fn resolve_addr(_node_hash: T::Hash) -> Option<T::AccountId> { None }
 	/// Resolve to name
-	fn resolve_name(node_hash: T::Hash) -> Option<Vec<u8>> { None }
+	fn resolve_name(_node_hash: T::Hash) -> Option<Vec<u8>> { None }
 	/// Resolve to profile hash
-	fn resolve_profile(node_hash: T::Hash) -> Option<T::Hash> { None }
+	fn resolve_profile(_node_hash: T::Hash) -> Option<T::Hash> { None }
 	/// Resolve to zone content
-	fn resolve_zone(node_hash: T::Hash) -> Option<Vec<u8>> { None }
+	fn resolve_zone(_node_hash: T::Hash) -> Option<Vec<u8>> { None }
 }
 
 impl <T: Trait> NameServiceResolver<T> for Module<T> {

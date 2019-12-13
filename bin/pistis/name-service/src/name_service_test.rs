@@ -62,16 +62,16 @@ mod tests {
 		type CreationFee = CreationFee;
 	}
 	parameter_types! {
-		pub const MinLength: usize = 3;
-		pub const MaxLength: usize = 16;
+		pub const MinNameLength: usize = 3;
+		pub const MaxNameLength: usize = 16;
 		pub const MaxZoneLength: usize = 1024;
 		pub const One: u64 = 1;
 	}
 	impl Trait for Test {
 		type Event = ();
 		type ForceOrigin = EnsureSignedBy<One, u64>;
-		type MinLength = MinLength;
-		type MaxLength = MaxLength;
+		type MinNameLength = MinNameLength;
+		type MaxNameLength = MaxNameLength;
 		type MaxZoneLength = MaxZoneLength;
 	}
 

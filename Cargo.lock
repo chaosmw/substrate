@@ -4284,6 +4284,7 @@ dependencies = [
  "name-service-module 2.0.0",
  "pallet-aura 2.0.0",
  "pallet-balances 2.0.0",
+ "pallet-collective 2.0.0",
  "pallet-grandpa 2.0.0",
  "pallet-indices 2.0.0",
  "pallet-randomness-collective-flip 2.0.0",

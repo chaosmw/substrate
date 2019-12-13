@@ -76,13 +76,10 @@ pub trait Trait: system::Trait {
 	type ForceOrigin: EnsureOrigin<Self::Origin>;
 
 	/// The minimum length a name may be.
-	type MinLength: Get<usize>;
+	type MinNameLength: Get<usize>;
 
 	/// The maximum length a name may be.
-	type MaxLength: Get<usize>;
-
-	/// The maximum length a zone may be
-	type MaxZoneLength: Get<usize>;
+	type MaxNameLength: Get<usize>;
 
 	/// The scope's name 
 	type ScopeName: Get<&'static str>; 
@@ -101,7 +98,7 @@ pub trait Trait: system::Trait {
 }
 
 decl_storage! {
-	trait Store for Module<T: Trait> as NameServiceModule {
+	trait Store for Module<T: Trait> as BusinessModule {
 		/// The lookup table for all the businesses
 		Businesses get(business_of): map T::Hash => BusinessOf<T>;	
 		/// The lookup table for all the product infos
@@ -141,13 +138,10 @@ decl_module! {
 		fn deposit_event() = default;
 
 		/// The minimum length a name may be.
-		const MinLength: u32 = T::MinLength::get() as u32;
+		const MinNameLength: u32 = T::MinNameLength::get() as u32;
 
 		/// The maximum length a name may be.
-		const MaxLength: u32 = T::MaxLength::get() as u32;
-
-		/// The maximum length a zone may be.
-		const MaxZoneLength: u32 = T::MaxZoneLength::get() as u32;
+		const MaxNameLength: u32 = T::MaxNameLength::get() as u32;
 
 		/// The scope's name
 		const ScopeName: &'static str = T::ScopeName::get();
@@ -173,8 +167,8 @@ decl_module! {
 			// Check if sender has previledge
 			Self::validate_authorization(&sender, Self::scope_name_hash())?;
 
-			ensure!(name.len() >= T::MinLength::get(), "Name too short");
-			ensure!(name.len() <= T::MaxLength::get(), "Name too long");
+			ensure!(name.len() >= T::MinNameLength::get(), "Name too short");
+			ensure!(name.len() <= T::MaxNameLength::get(), "Name too long");
 
 			Self::validate_expiration(expiration)?;
 

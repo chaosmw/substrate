@@ -38,7 +38,7 @@ pub use support::{
 };
 
 /// An index to a block.
-pub type BlockNumber = u32;
+pub type BlockNumber = u64;
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
@@ -49,13 +49,13 @@ pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::Account
 
 /// The type for looking up accounts. We don't expect more than 4 billion of them, but you
 /// never know...
-pub type AccountIndex = u32;
+pub type AccountIndex = u64;
 
 /// Balance of an account.
 pub type Balance = u128;
 
 /// Index of a transaction in the chain.
-pub type Index = u32;
+pub type Index = u64;
 
 /// A hash of some data used by the chain.
 pub type Hash = primitives::H256;
@@ -63,8 +63,10 @@ pub type Hash = primitives::H256;
 /// Digest item type.
 pub type DigestItem = generic::DigestItem<Hash>;
 
-/// Used for the module template in `./template.rs`
-mod template;
+/// Name service module
+pub use name_service;
+/// Business module
+pub use business;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -92,8 +94,8 @@ pub mod opaque {
 
 /// This runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("node-template"),
-	impl_name: create_runtime_str!("node-template"),
+	spec_name: create_runtime_str!("node-pistis"),
+	impl_name: create_runtime_str!("node-pistis"),
 	authoring_version: 1,
 	spec_version: 1,
 	impl_version: 1,
@@ -231,9 +233,43 @@ impl sudo::Trait for Runtime {
 	type Proposal = Call;
 }
 
-/// Used for the module template in `./template.rs`
-impl template::Trait for Runtime {
+type CouncilCollective = collective::Instance1;
+impl collective::Trait<CouncilCollective> for Runtime {
+	type Origin = Origin;
+	type Proposal = Call;
 	type Event = Event;
+}
+
+parameter_types! {
+	pub const MinNameLength: usize = 3;
+	pub const MaxNameLength: usize = 256;
+	pub const MaxZoneLength: usize = 1024;
+}
+impl name_service::Trait for Runtime {
+	type Event = Event;
+	type ForceOrigin = collective::EnsureMember<AccountId, CouncilCollective>;
+	type MinNameLength = MinNameLength;
+	type MaxNameLength = MaxNameLength;
+	type MaxZoneLength = MaxZoneLength;
+}
+
+parameter_types! {
+	pub const ScopeName: &'static str = "pistis";
+	pub const MaxSeqIDLength: usize = 64;
+	pub const MaxExtraLength: usize = 1024;
+	pub const MaxProductInfoCount: usize = 10;
+}
+
+impl business::Trait for Runtime {
+	type Event = Event;
+	type ForceOrigin = collective::EnsureMember<AccountId, CouncilCollective>;
+	type MinNameLength = MinNameLength;
+	type MaxNameLength = MaxNameLength;
+	type ScopeName = ScopeName; 
+	type MaxSeqIDLength = MaxSeqIDLength;
+	type MaxExtraLength = MaxExtraLength;
+	type MaxProductInfoCount = MaxProductInfoCount;
+	type NameServiceResolver = NameServiceModule;
 }
 
 construct_runtime!(
@@ -250,9 +286,10 @@ construct_runtime!(
 		Balances: balances::{default, Error},
 		TransactionPayment: transaction_payment::{Module, Storage},
 		Sudo: sudo,
-		// Used for the module template in `./template.rs`
-		TemplateModule: template::{Module, Call, Storage, Event<T>},
 		RandomnessCollectiveFlip: randomness_collective_flip::{Module, Call, Storage},
+		Council: collective::<Instance1>::{Module, Call, Storage, Origin<T>, Event<T>, Config<T>},
+		NameServiceModule: name_service::{Module, Call, Storage, Event<T>},
+		BusinessModule: business::{Module, Call, Storage, Event<T>},
 	}
 );
 
