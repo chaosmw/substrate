@@ -73,22 +73,10 @@ pub struct ResolveRecord<Hash, AccountId> {
 // 	pub write_url: Vec<u8>,
 // }
 
-type BalanceOf<T> = <<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::Balance;
-type NegativeImbalanceOf<T> =
-	<<T as Trait>::Currency as Currency<<T as system::Trait>::AccountId>>::NegativeImbalance;
 
 pub trait Trait: system::Trait {
 	/// The overarching event type.
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
-
-	/// The currency trait.
-	type Currency: ReservableCurrency<Self::AccountId>;
-
-	/// Reservation fee.
-	type ReservationFee: Get<BalanceOf<Self>>;
-
-	/// What to do with slashed funds.
-	type Slashed: OnUnbalanced<NegativeImbalanceOf<Self>>;
 
 	/// The origin which may forcibly set or remove a name. Root can always do this.
 	type ForceOrigin: EnsureOrigin<Self::Origin>;
@@ -105,8 +93,6 @@ pub trait Trait: system::Trait {
 
 decl_storage! {
 	trait Store for Module<T: Trait> as NameServiceModule {
-		/// The lookup table for names.
-		NameOf: map T::AccountId => Option<(Vec<u8>, BalanceOf<T>)>;
 		/// The lookup table for node records
 		NodeOf get(node_of): map T::Hash => Option<NodeRecord<T::AccountId>>;
 		/// The lookup table for resolve records
@@ -119,18 +105,7 @@ decl_event!(
 	where
 		Hash = <T as system::Trait>::Hash,
 		AccountId = <T as system::Trait>::AccountId,
-		Balance = BalanceOf<T>,
 	{
-		/// A name was set.
-		NameSet(AccountId),
-		/// A name was forcibly set.
-		NameForced(AccountId),
-		/// A name was changed.
-		NameChanged(AccountId),
-		/// A name was cleared, and the given balance returned.
-		NameCleared(AccountId, Balance),
-		/// A name was removed and the given balance slashed.
-		NameKilled(AccountId, Balance),
 		/// Logged when root is changed
 		RootChanged(AccountId),
 		/// Logged when the owner of a node assigns a new owner to a subnode.
@@ -157,9 +132,6 @@ decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
 		fn deposit_event() = default;
 
-		/// Reservation fee.
-		const ReservationFee: BalanceOf<T> = T::ReservationFee::get();
-
 		/// The minimum length a name may be.
 		const MinLength: u32 = T::MinLength::get() as u32;
 
@@ -168,118 +140,6 @@ decl_module! {
 
 		/// The maximum length a zone may be.
 		const MaxZoneLength: u32 = T::MaxZoneLength::get() as u32;
-
-		/// Set an account's name. The name should be a UTF-8-encoded string by convention, though
-		/// we don't check it.
-		///
-		/// The name may not be more than `T::MaxLength` bytes, nor less than `T::MinLength` bytes.
-		///
-		/// If the account doesn't already have a name, then a fee of `ReservationFee` is reserved
-		/// in the account.
-		///
-		/// The dispatch origin for this call must be _Signed_.
-		///
-		/// # <weight>
-		/// - O(1).
-		/// - At most one balance operation.
-		/// - One storage read/write.
-		/// - One event.
-		/// # </weight>
-		#[weight = SimpleDispatchInfo::FixedNormal(50_000)]
-		fn set_name(origin, name: Vec<u8>) {
-			let sender = ensure_signed(origin)?;
-
-			ensure!(name.len() >= T::MinLength::get(), "Name too short");
-			ensure!(name.len() <= T::MaxLength::get(), "Name too long");
-
-			let deposit = if let Some((_, deposit)) = <NameOf<T>>::get(&sender) {
-				Self::deposit_event(RawEvent::NameSet(sender.clone()));
-				deposit
-			} else {
-				let deposit = T::ReservationFee::get();
-				T::Currency::reserve(&sender, deposit.clone())?;
-				Self::deposit_event(RawEvent::NameChanged(sender.clone()));
-				deposit
-			};
-
-			<NameOf<T>>::insert(&sender, (name, deposit));
-		}
-
-		/// Clear an account's name and return the deposit. Fails if the account was not named.
-		///
-		/// The dispatch origin for this call must be _Signed_.
-		///
-		/// # <weight>
-		/// - O(1).
-		/// - One balance operation.
-		/// - One storage read/write.
-		/// - One event.
-		/// # </weight>
-		fn clear_name(origin) {
-			let sender = ensure_signed(origin)?;
-
-			let deposit = <NameOf<T>>::take(&sender).ok_or("Not named")?.1;
-
-			let _ = T::Currency::unreserve(&sender, deposit.clone());
-
-			Self::deposit_event(RawEvent::NameCleared(sender, deposit));
-		}
-
-		/// Remove an account's name and take charge of the deposit.
-		///
-		/// Fails if `who` has not been named. The deposit is dealt with through `T::Slashed`
-		/// imbalance handler.
-		///
-		/// The dispatch origin for this call must be _Root_ or match `T::ForceOrigin`.
-		///
-		/// # <weight>
-		/// - O(1).
-		/// - One unbalanced handler (probably a balance transfer)
-		/// - One storage read/write.
-		/// - One event.
-		/// # </weight>
-		#[weight = SimpleDispatchInfo::FreeOperational]
-		fn kill_name(origin, target: <T::Lookup as StaticLookup>::Source) {
-			T::ForceOrigin::try_origin(origin)
-				.map(|_| ())
-				.or_else(ensure_root)
-				.map_err(|_| "bad origin")?;
-
-			// Figure out who we're meant to be clearing.
-			let target = T::Lookup::lookup(target)?;
-			// Grab their deposit (and check that they have one).
-			let deposit = <NameOf<T>>::take(&target).ok_or("Not named")?.1;
-			// Slash their deposit from them.
-			T::Slashed::on_unbalanced(T::Currency::slash_reserved(&target, deposit.clone()).0);
-
-			Self::deposit_event(RawEvent::NameKilled(target, deposit));
-		}
-
-		/// Set a third-party account's name with no deposit.
-		///
-		/// No length checking is done on the name.
-		///
-		/// The dispatch origin for this call must be _Root_ or match `T::ForceOrigin`.
-		///
-		/// # <weight>
-		/// - O(1).
-		/// - At most one balance operation.
-		/// - One storage read/write.
-		/// - One event.
-		/// # </weight>
-		#[weight = SimpleDispatchInfo::FreeOperational]
-		fn force_name(origin, target: <T::Lookup as StaticLookup>::Source, name: Vec<u8>) {
-			T::ForceOrigin::try_origin(origin)
-				.map(|_| ())
-				.or_else(ensure_root)
-				.map_err(|_| "bad origin")?;
-
-			let target = T::Lookup::lookup(target)?;
-			let deposit = <NameOf<T>>::get(&target).map(|x| x.1).unwrap_or_else(Zero::zero);
-			<NameOf<T>>::insert(&target, (name, deposit));
-
-			Self::deposit_event(RawEvent::NameForced(target));
-		}
 
 		/// Set admin owner for this module
 		#[weight = SimpleDispatchInfo::FixedNormal(50_000)]
@@ -391,13 +251,6 @@ decl_module! {
 			Self::only_owner(node_hash, &sender)?;
 
 			ensure!(zone.len() <= T::MaxZoneLength::get(), "zone content too long");
-			// TODO: check json
-			// #[cfg(std)]
-			// let _json = serde_json::from_str::<Value>(&String::from_utf8(zone.clone()).unwrap());
-
-			// #[cfg(no_std)]
-			// let _json = serde_json_core::from_str::<Value>(&String::from_utf8(zone.clone()).unwrap());
-			
 			Self::do_set_resolve_zone(node_hash, &zone)?;
 			Self::deposit_event(RawEvent::ResolveZoneChanged(node_hash, zone));
 
@@ -527,11 +380,15 @@ pub trait NameServiceResolver<T: system::Trait> {
 
 impl <T: Trait> NameServiceResolver<T> for Module<T> {
 	/// Resolve name hash to record
+	/// 
+	/// @node_hash	the node hash
 	fn resolve(node_hash: T::Hash) -> Option<ResolveRecord<T::Hash, T::AccountId>> {
 		Self::resolve_of(node_hash)
 	}
 
 	/// Resolve name hash to addr
+	/// 
+	/// @node_hash	the node hash
 	fn resolve_addr(node_hash: T::Hash) -> Option<T::AccountId> {
 		match Self::resolve_of(node_hash) {
 			Some(record) => Some(record.addr),
@@ -540,6 +397,8 @@ impl <T: Trait> NameServiceResolver<T> for Module<T> {
 	}
 
 	/// Resolve name hash to name
+	/// 
+	/// @node_hash	the node hash
 	fn resolve_name(node_hash: T::Hash) -> Option<Vec<u8>> {
 		match Self::resolve_of(node_hash) {
 			Some(record) => Some(record.name),
@@ -548,6 +407,8 @@ impl <T: Trait> NameServiceResolver<T> for Module<T> {
 	}
 
 	/// Resolve name hash to profile
+	/// 
+	/// @node_hash	the node hash
 	fn resolve_profile(node_hash: T::Hash) -> Option<T::Hash> {
 		match Self::resolve_of(node_hash) {
 			Some(record) => Some(record.profile),
@@ -556,6 +417,8 @@ impl <T: Trait> NameServiceResolver<T> for Module<T> {
 	}
 
 	/// Resolve name hash to zone content
+	/// 
+	/// @node_hash	the node hash
 	fn resolve_zone(node_hash: T::Hash) -> Option<Vec<u8>> {
 		match Self::resolve_of(node_hash) {
 			Some(record) => Some(record.zone),

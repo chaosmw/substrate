@@ -62,7 +62,6 @@ mod tests {
 		type CreationFee = CreationFee;
 	}
 	parameter_types! {
-		pub const ReservationFee: u64 = 2;
 		pub const MinLength: usize = 3;
 		pub const MaxLength: usize = 16;
 		pub const MaxZoneLength: usize = 1024;
@@ -70,9 +69,6 @@ mod tests {
 	}
 	impl Trait for Test {
 		type Event = ();
-		type Currency = Balances;
-		type ReservationFee = ReservationFee;
-		type Slashed = ();
 		type ForceOrigin = EnsureSignedBy<One, u64>;
 		type MinLength = MinLength;
 		type MaxLength = MaxLength;
@@ -96,70 +92,6 @@ mod tests {
 			vesting: vec![],
 		}.assimilate_storage(&mut t).unwrap();
 		t.into()
-	}
-
-	#[test]
-	fn kill_name_should_work() {
-		new_test_ext().execute_with(|| {
-			assert_ok!(NameService::set_name(Origin::signed(2), b"Dave".to_vec()));
-			assert_eq!(Balances::total_balance(&2), 10);
-			assert_ok!(NameService::kill_name(Origin::signed(1), 2));
-			assert_eq!(Balances::total_balance(&2), 8);
-			assert_eq!(<NameOf<Test>>::get(2), None);
-		});
-	}
-
-	#[test]
-	fn force_name_should_work() {
-		new_test_ext().execute_with(|| {
-			assert_noop!(
-				NameService::set_name(Origin::signed(2), b"Dr. David Brubeck, III".to_vec()),
-				"Name too long"
-			);
-
-			assert_ok!(NameService::set_name(Origin::signed(2), b"Dave".to_vec()));
-			assert_eq!(Balances::reserved_balance(&2), 2);
-			assert_ok!(NameService::force_name(Origin::signed(1), 2, b"Dr. David Brubeck, III".to_vec()));
-			assert_eq!(Balances::reserved_balance(&2), 2);
-			assert_eq!(<NameOf<Test>>::get(2).unwrap(), (b"Dr. David Brubeck, III".to_vec(), 2));
-		});
-	}
-
-	#[test]
-	fn normal_operation_should_work() {
-		new_test_ext().execute_with(|| {
-			assert_ok!(NameService::set_name(Origin::signed(1), b"Gav".to_vec()));
-			assert_eq!(Balances::reserved_balance(&1), 2);
-			assert_eq!(Balances::free_balance(&1), 8);
-			assert_eq!(<NameOf<Test>>::get(1).unwrap().0, b"Gav".to_vec());
-
-			assert_ok!(NameService::set_name(Origin::signed(1), b"Gavin".to_vec()));
-			assert_eq!(Balances::reserved_balance(&1), 2);
-			assert_eq!(Balances::free_balance(&1), 8);
-			assert_eq!(<NameOf<Test>>::get(1).unwrap().0, b"Gavin".to_vec());
-
-			assert_ok!(NameService::clear_name(Origin::signed(1)));
-			assert_eq!(Balances::reserved_balance(&1), 0);
-			assert_eq!(Balances::free_balance(&1), 10);
-		});
-	}
-
-	#[test]
-	fn error_catching_should_work() {
-		new_test_ext().execute_with(|| {
-			assert_noop!(NameService::clear_name(Origin::signed(1)), "Not named");
-
-			assert_noop!(NameService::set_name(Origin::signed(3), b"Dave".to_vec()), "not enough free funds");
-
-			assert_noop!(NameService::set_name(Origin::signed(1), b"Ga".to_vec()), "Name too short");
-			assert_noop!(
-				NameService::set_name(Origin::signed(1), b"Gavin James Wood, Esquire".to_vec()),
-				"Name too long"
-			);
-			assert_ok!(NameService::set_name(Origin::signed(1), b"Dave".to_vec()));
-			assert_noop!(NameService::kill_name(Origin::signed(2), 1), "bad origin");
-			assert_noop!(NameService::force_name(Origin::signed(2), 1, b"Whatever".to_vec()), "bad origin");
-		});
 	}
 
 	#[test]
