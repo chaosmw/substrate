@@ -222,4 +222,42 @@ mod tests {
 		});
 	}
 
+	#[test]
+	fn blake2_name_hash_should_work() {
+		let data = b"eth";
+		let label = (data).using_encoded(<Test as system::Trait>::Hashing::hash); 
+		println!("label1 = {:#?}", label);
+
+		let mut dest = [0;32];
+		dest.copy_from_slice(blake2_rfc::blake2b::blake2b(32, &[], data).as_bytes());
+		let label:H256 = dest.into(); 
+		println!("label2 = {:#?}", label);
+
+		let hash = <Test as system::Trait>::Hashing::hash(data);
+		println!("label3 = {:#?}", hash);
+
+		let hash = <Test as system::Trait>::Hashing::hash(String::from("eth").as_bytes());
+		println!("label4 = {:#?}", hash);
+
+		// should use byte literal
+		let label = ("eth").using_encoded(<Test as system::Trait>::Hashing::hash); 
+		println!("label5 = {:#?}", label);
+		assert_ne!(hash, label);
+
+		println!("root hash = {:#?}", <Test as system::Trait>::Hashing::hash(&[0u8;32]));
+
+		let label = (String::from("eth").as_bytes()).using_encoded(<Test as system::Trait>::Hashing::hash); 
+		println!("label6 = {:#?}", label);
+
+		let node_hash: H256 = from_slice(&NameService::namehash("hsiung.eth")).into();
+		println!("namehash of hsiung.eth = {:#?}", node_hash);
+	}
+
+	fn from_slice(bytes: &[u8]) -> [u8; 32] {
+		let mut array = [0; 32];
+		let bytes = &bytes[..array.len()]; // panics if not enough data
+		array.copy_from_slice(bytes); 
+		array
+	}
+
 }

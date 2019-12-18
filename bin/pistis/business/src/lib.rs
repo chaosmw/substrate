@@ -81,9 +81,6 @@ pub trait Trait: system::Trait {
 	/// The maximum length a name may be.
 	type MaxNameLength: Get<usize>;
 
-	/// The scope's name 
-	type ScopeName: Get<&'static str>; 
-
 	/// The maximum length a sequence id may be
 	type MaxSeqIDLength: Get<usize>;
 	
@@ -142,9 +139,6 @@ decl_module! {
 
 		/// The maximum length a name may be.
 		const MaxNameLength: u32 = T::MaxNameLength::get() as u32;
-
-		/// The scope's name
-		const ScopeName: &'static str = T::ScopeName::get();
 
 		/// The maximum length a sequence id may be
 		const MaxSeqIDLength: u32 = T::MaxSeqIDLength::get() as u32;
@@ -423,15 +417,19 @@ impl<T: Trait> Module<T> {
 	/// @biz_hash	the business hash
 	/// @seq_id	the sequence id
 	fn product_hash(biz_hash: T::Hash, seq_id: Vec<u8>) -> T::Hash {
-		(
-			biz_hash,
-			seq_id.clone(),
-		).using_encoded(<T as system::Trait>::Hashing::hash)
+		// (
+		// 	biz_hash,
+		// 	seq_id.clone(),
+		// ).using_encoded(<T as system::Trait>::Hashing::hash)
+
+		let mut data = biz_hash.as_ref().to_vec();
+		data.append(&mut seq_id.clone());
+		<T as system::Trait>::Hashing::hash(data.as_slice())
 	}
 	
 	/// Get scope name hash
 	fn scope_name_hash() -> T::Hash {
 		// TODO: calculate name hash recursively
-		(T::ScopeName::get()).using_encoded(<T as system::Trait>::Hashing::hash)
+		(b"pistis").using_encoded(<T as system::Trait>::Hashing::hash)
 	}
 }

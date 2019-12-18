@@ -2932,6 +2932,7 @@ dependencies = [
 name = "name-service-module"
 version = "2.0.0"
 dependencies = [
+ "blake2-rfc 0.2.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "frame-support 2.0.0",
  "frame-system 2.0.0",
  "pallet-balances 2.0.0",

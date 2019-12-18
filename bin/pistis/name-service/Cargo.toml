@@ -18,6 +18,7 @@ balances = { package = "pallet-balances", path = "../../../frame/balances", defa
 primitives = { package = "sp-core", path = "../../../primitives/core", default-features = false }
 
 [dev-dependencies]
+blake2-rfc = { version = "0.2.18", default-features = false }
 
 [features]
 default = ["std"]

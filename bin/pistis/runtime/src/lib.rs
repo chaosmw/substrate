@@ -254,7 +254,6 @@ impl name_service::Trait for Runtime {
 }
 
 parameter_types! {
-	pub const ScopeName: &'static str = "pistis";
 	pub const MaxSeqIDLength: usize = 64;
 	pub const MaxExtraLength: usize = 1024;
 	pub const MaxProductInfoCount: usize = 10;
@@ -265,7 +264,6 @@ impl business::Trait for Runtime {
 	type ForceOrigin = collective::EnsureMember<AccountId, CouncilCollective>;
 	type MinNameLength = MinNameLength;
 	type MaxNameLength = MaxNameLength;
-	type ScopeName = ScopeName; 
 	type MaxSeqIDLength = MaxSeqIDLength;
 	type MaxExtraLength = MaxExtraLength;
 	type MaxProductInfoCount = MaxProductInfoCount;

@@ -179,10 +179,16 @@ decl_module! {
 			let sender = ensure_signed(origin)?;
 			Self::only_owner(node_hash, &sender)?;
 
-			let subnode_hash = (
-				node_hash,
-				label,
-			).using_encoded(<T as system::Trait>::Hashing::hash);
+			// let subnode_hash = (
+			// 	node_hash,
+			// 	label,
+			// ).using_encoded(<T as system::Trait>::Hashing::hash);
+			// TODO: move to a common place
+
+			let mut node = node_hash.as_ref().to_vec();
+			node.append(&mut label.as_ref().to_vec());
+
+			let subnode_hash = <T as system::Trait>::Hashing::hash(node.as_slice()); 
 
 			Self::do_set_owner(subnode_hash, &owner)?;
 			Self::deposit_event(RawEvent::NewOwner(node_hash, label, owner));
@@ -361,6 +367,39 @@ impl<T: Trait> Module<T> {
 		<ResolveOf<T>>::insert(node_hash, record);
 
 		Ok(())
+	}
+}
+
+/// Calculate namehash
+pub trait NameHasher<T: system::Trait> {
+	/// Hashing algorithm
+	type Hashing;
+	/// Hash the name
+	fn namehash(name: &str) -> Vec<u8>;
+}
+
+impl <T: Trait> NameHasher<T> for Module<T> {
+	type Hashing = T::Hashing;
+	/// Hash the name 
+	/// Take a reference to https://github.com/ethereum/EIPs/blob/master/EIPS/eip-137.md
+	/// https://github.com/InstateDev/namehash-rust/blob/master/src/lib.rs
+	/// 
+	/// @name	the name to be hashed
+	fn namehash(name: &str) -> Vec<u8> {
+		let mut node = vec![0u8; 32];
+		if name.is_empty() {
+			return node;
+		}
+		let mut labels: Vec<&str> = name.split(".").collect();
+		labels.reverse();
+		for label in labels.iter() {
+			let mut label_hash = Self::Hashing::hash(label.as_bytes());
+			node.append(&mut label_hash.as_ref().to_vec());
+			let node_hash = Self::Hashing::hash(node.as_slice());
+			node = node_hash.as_ref().to_vec();
+		}
+
+		node
 	}
 }
 

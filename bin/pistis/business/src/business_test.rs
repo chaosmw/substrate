@@ -63,7 +63,6 @@ mod tests {
 		type CreationFee = CreationFee;
 	}
 
-	const SCOPE_PISTIS: &str = "pistis"; 
 	const BISINESS_OWNER: &str = "longguhu";
 	const ALICE: &str = "alice";
 	const BOB: &str = "bob";
@@ -73,7 +72,6 @@ mod tests {
 		pub const MinNameLength: usize = 3;
 		pub const MaxNameLength: usize = 16;
 		pub const One: u64 = 1;
-		pub const ScopeName: &'static str = SCOPE_PISTIS;
 		pub const MaxSeqIDLength: usize = 64;
 		pub const MaxExtraLength: usize = 1024;
 		pub const MaxProductInfoCount: usize = 10;
@@ -83,7 +81,6 @@ mod tests {
 		type ForceOrigin = EnsureSignedBy<One, u64>;
 		type MinNameLength = MinNameLength;
 		type MaxNameLength = MaxNameLength;
-		type ScopeName = ScopeName; 
 		type MaxSeqIDLength = MaxSeqIDLength;
 		type MaxExtraLength = MaxExtraLength;
 		type MaxProductInfoCount = MaxProductInfoCount;
@@ -92,7 +89,8 @@ mod tests {
 
 	impl NameServiceResolver<Test> for Test {
 		fn resolve_addr(node_hash: <Test as system::Trait>::Hash) -> Option<<Test as system::Trait>::AccountId> {
-			let scope = Self::single_name_hash(<Test as Trait>::ScopeName::get());
+			// let scope = Self::single_name_hash(&<Test as Trait>::ScopeName::get());
+			let scope = Service::scope_name_hash();
 			let longguhu = Self::single_name_hash(BISINESS_OWNER);
 			let alice = Self::single_name_hash(ALICE);
 			let bob = Self::single_name_hash(BOB);
@@ -246,6 +244,23 @@ mod tests {
 
 			assert_eq!(Service::product_of(product_hash).infos.len(), 2);
 		});
+	}
+
+	#[test]
+	fn product_hash_should_work() {
+		let biz_hash = <Test as system::Trait>::Hash::default(); 
+		let seq_id = &"1".repeat(32)[..];
+		let product_hash = Service::product_hash(biz_hash, seq_id.into());
+
+		println!("biz_hash = {:#?}", biz_hash);
+		println!("product_hash = {:#?}", product_hash);
+		let mut data = biz_hash.as_ref().to_vec();
+		let mut seq_vec:Vec<u8> = seq_id.into();
+
+		println!("seq_vec = {:#?}", seq_vec);
+		data.append(&mut seq_vec);
+		let hash = <Test as system::Trait>::Hashing::hash(&data);
+		assert_eq!(product_hash, hash);
 	}
 
 }
