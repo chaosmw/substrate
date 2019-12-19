@@ -147,7 +147,7 @@ decl_module! {
 			T::ForceOrigin::try_origin(origin)
 				.map(|_| ())
 				.or_else(ensure_root)
-				.map_err(|_| "bad origin")?;
+				.map_err(|_| "Bad origin")?;
 
 			let node_hash: T::Hash = T::Hash::default();
 			Self::do_set_owner(node_hash, &owner)?;
@@ -164,7 +164,7 @@ decl_module! {
 			Self::only_owner(node_hash, &sender)?;
 
 			let mut record = Self::node_of(node_hash).unwrap();
-			ensure!(record.owner != owner, "owner is the same account");
+			ensure!(record.owner != owner, "Owner is the same account");
 			record.owner = owner.clone();
 
 			<NodeOf<T>>::insert(node_hash, record);
@@ -202,7 +202,7 @@ decl_module! {
 			Self::only_owner(node_hash, &sender)?;
 
 			let mut record = Self::node_of(node_hash).unwrap();
-			ensure!(record.ttl != ttl, "ttl is the same value");
+			ensure!(record.ttl != ttl, "TTL is the same value");
 			record.ttl = ttl;
 
 			<NodeOf<T>>::insert(node_hash, record);
@@ -229,8 +229,8 @@ decl_module! {
 			let sender = ensure_signed(origin)?;
 			Self::only_owner(node_hash, &sender)?;
 
-			ensure!(name.len() >= T::MinNameLength::get(), "name too short");
-			ensure!(name.len() <= T::MaxNameLength::get(), "name too long");
+			ensure!(name.len() >= T::MinNameLength::get(), "Name too short");
+			ensure!(name.len() <= T::MaxNameLength::get(), "Name too long");
 			
 			Self::do_set_resolve_name(node_hash, &name)?;
 			Self::deposit_event(RawEvent::ResolveNameChanged(node_hash, name));
@@ -256,7 +256,7 @@ decl_module! {
 			let sender = ensure_signed(origin)?;
 			Self::only_owner(node_hash, &sender)?;
 
-			ensure!(zone.len() <= T::MaxZoneLength::get(), "zone content too long");
+			ensure!(zone.len() <= T::MaxZoneLength::get(), "Zone content too long");
 			Self::do_set_resolve_zone(node_hash, &zone)?;
 			Self::deposit_event(RawEvent::ResolveZoneChanged(node_hash, zone));
 
@@ -272,10 +272,10 @@ impl<T: Trait> Module<T> {
 	/// @sender	the sender
 	fn only_owner(node_hash: T::Hash, sender: &T::AccountId) -> Result {
 		if let Some(record) = Self::node_of(node_hash) {
-			ensure!(record.owner == *sender, "sender is not owner");
+			ensure!(record.owner == *sender, "Sender is not owner");
 			Ok(())
 		} else {
-			Err("node does not exist")
+			Err("Node does not exist")
 		}
 	}
 
@@ -285,7 +285,7 @@ impl<T: Trait> Module<T> {
 	/// @owner	the owner account
 	fn do_set_owner(node_hash: T::Hash, owner: &T::AccountId) -> Result {
 		let mut record = if let Some(record) = Self::node_of(node_hash) {
-			ensure!(record.owner != *owner, "owner is the same account");
+			ensure!(record.owner != *owner, "Owner is the same account");
 			record
 		} else {
 			NodeRecord::<T::AccountId>::default()
@@ -303,7 +303,7 @@ impl<T: Trait> Module<T> {
 	/// @addr	the resolve addr
 	fn do_set_resolve_addr(node_hash: T::Hash, addr: &T::AccountId) -> Result {
 		let mut record = if let Some(record) = Self::resolve_of(node_hash) {
-			ensure!(record.addr != *addr, "addr is the same value");
+			ensure!(record.addr != *addr, "Addr is the same value");
 			record
 		} else {
 			ResolveRecord::<T::Hash, T::AccountId>::default()
@@ -321,7 +321,7 @@ impl<T: Trait> Module<T> {
 	/// @name	the resolve name
 	fn do_set_resolve_name(node_hash: T::Hash, name: &Vec<u8>) -> Result {
 		let mut record = if let Some(record) = Self::resolve_of(node_hash) {
-			ensure!(record.name != *name, "name is the same value");
+			ensure!(record.name != *name, "Name is the same value");
 			record
 		} else {
 			ResolveRecord::<T::Hash, T::AccountId>::default()
@@ -339,7 +339,7 @@ impl<T: Trait> Module<T> {
 	/// @profile	the resolve profile
 	fn do_set_resolve_profile(node_hash: T::Hash, profile: T::Hash) -> Result {
 		let mut record = if let Some(record) = Self::resolve_of(node_hash) {
-			ensure!(record.profile != profile, "profile is the same value");
+			ensure!(record.profile != profile, "Profile is the same value");
 			record
 		} else {
 			ResolveRecord::<T::Hash, T::AccountId>::default()
@@ -357,7 +357,7 @@ impl<T: Trait> Module<T> {
 	/// @zone	the resolve zone content
 	fn do_set_resolve_zone(node_hash: T::Hash, zone: &Vec<u8>) -> Result {
 		let mut record = if let Some(record) = Self::resolve_of(node_hash) {
-			ensure!(record.zone != *zone, "zone is the same value");
+			ensure!(record.zone != *zone, "Zone is the same value");
 			record
 		} else {
 			ResolveRecord::<T::Hash, T::AccountId>::default()
